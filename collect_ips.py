@@ -73,12 +73,17 @@ def process_site(site):
     try:
         soup = BeautifulSoup(html, 'html.parser')
         elements = soup.find_all(site['element'])
+        if not elements:
+            logging.warning(f"未在 {site['url']} 找到任何匹配的元素")
+            return set()
+        logging.info(f"从 {site['url']} 找到 {len(elements)} 个元素")
         ips = set()
         for el in elements:
             ips.update(ip for ip in extract_ips(el.get_text()) if validate_ip(ip))
+        logging.info(f"从 {site['url']} 提取到 {len(ips)} 个IP地址")
         return ips
     except Exception as e:
-        logging.error(f"解析错误: {e}")
+        logging.error(f"解析错误: {e} (URL: {site['url']})")
         return set()
 
 def main():
