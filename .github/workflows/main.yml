@@ -25,7 +25,7 @@ jobs:
         pip install -c constraints.txt requests beautifulsoup4
 
     - name: Run script
-      run: python fetch_ips.py
+      run: python collect_ips.py
 
     - name: Verify IP list
       run: |
