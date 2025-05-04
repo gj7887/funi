@@ -1,0 +1,43 @@
+name: Update IP List
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 */3 * * *'
+
+jobs:
+  update-ip-list:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4  # 不再需要显式传递 token
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip pip-tools
+        echo "requests==2.31.0" > constraints.txt
+        echo "beautifulsoup4==4.12.0" >> constraints.txt
+        pip install -c constraints.txt requests beautifulsoup4
+
+    - name: Run script
+      run: python fetch_ips.py
+
+    - name: Verify IP list
+      run: |
+        if [ ! -s ip.csv ]; then
+          echo "Error: IP list is empty!"
+          exit 1
+        fi
+
+    - name: Commit and push
+      run: |
+        git config --global user.email "tianshideyou@proton.me"
+        git config --global user.name "IP Updater"
+        git add ip.csv
+        git commit -m "Update IP list"
+        git push
