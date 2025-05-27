@@ -22,7 +22,7 @@ logging.basicConfig(
 CONFIG = {
     'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
     'REQUEST_TIMEOUT': 10,
-    'OUTPUT_FILE': 'ip_list.csv',
+    'OUTPUT_FILE': 'ip.csv',
     'URLS': [
         {"url": "https://www.wetest.vip/page/cloudflare/address_v4.html", "element": "tr"},
         {"url": "https://www.wetest.vip/page/cloudfront/address_v4.html", "element": "tr"},
