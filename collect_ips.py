@@ -57,7 +57,7 @@ def save_results(ip_set, filename):
     try:
         with open(filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow(['IP Address'])
+            # 直接写入IP地址，不写标题行
             writer.writerows([[ip] for ip in sorted(ip_set)])
         logging.info(f"成功保存 {len(ip_set)} 个IP地址到 {filename}")
     except IOError as e:
