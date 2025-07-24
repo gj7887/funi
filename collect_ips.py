@@ -25,6 +25,7 @@ CONFIG = {
     'OUTPUT_FILE': 'ip.csv',
     'URLS': [
         {"url": "https://www.wetest.vip/page/cloudflare/address_v4.html", "element": "tr"},
+        {"url": "https://www.wetest.vip/page/edgeone/address_v4.html", "element": "tr"},
         {"url": "https://www.wetest.vip/page/cloudfront/address_v4.html", "element": "tr"},
     ],
     'IP_PATTERN': r'\b(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
