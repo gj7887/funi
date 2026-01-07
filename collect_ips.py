@@ -5,6 +5,7 @@ import os
 import csv
 import logging
 import ipaddress
+import time
 from requests.exceptions import RequestException
 from concurrent.futures import ThreadPoolExecutor
 
@@ -25,8 +26,11 @@ CONFIG = {
     'OUTPUT_FILE': 'ip.csv',
     'IPV4_OUTPUT': 'ipv4.csv',
     'IPV6_OUTPUT': 'ipv6.csv',
+    'TEST_RESULT_FILE': 'ip_test_result.csv',
     'MAX_IPV4': 15,
     'MAX_IPV6': 15,
+    'PING_TIMEOUT': 3,
+    'SPEED_TEST_SIZE': 1024,  # 1KB测试数据
     'URLS': [
         {"url": "https://www.wetest.vip/page/cloudflare/address_v4.html", "element": "tr"},
         {"url": "https://www.wetest.vip/page/cloudfront/address_v4.html", "element": "tr"},
@@ -70,6 +74,57 @@ def save_results(ip_list, filename):
         logging.info(f"成功保存 {len(ip_list)} 个IP地址到 {filename}")
     except IOError as e:
         logging.error(f"文件保存失败: {e}")
+
+def test_ip_connection(ip, port=80):
+    """测试IP连接延迟"""
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET if ':' not in ip else socket.AF_INET6, socket.SOCK_STREAM)
+        sock.settimeout(CONFIG['PING_TIMEOUT'])
+        start_time = time.time()
+        sock.connect((ip, port))
+        end_time = time.time()
+        sock.close()
+        latency = round((end_time - start_time) * 1000, 2)  # 转换为毫秒
+        return latency
+    except Exception as e:
+        logging.warning(f"IP {ip} 连接测试失败: {e}")
+        return None
+
+def test_ip_speed(ip, port=80):
+    """测试IP下载速度 (KB/s)"""
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET if ':' not in ip else socket.AF_INET6, socket.SOCK_STREAM)
+        sock.settimeout(CONFIG['PING_TIMEOUT'])
+        start_time = time.time()
+        sock.connect((ip, port))
+        # 发送测试数据
+        test_data = b'A' * CONFIG['SPEED_TEST_SIZE']
+        sock.sendall(test_data)
+        end_time = time.time()
+        sock.close()
+        duration = end_time - start_time
+        if duration > 0:
+            speed = round((CONFIG['SPEED_TEST_SIZE'] / 1024) / duration, 2)  # KB/s
+            return speed
+        return None
+    except Exception as e:
+        logging.warning(f"IP {ip} 速度测试失败: {e}")
+        return None
+
+def save_test_results(results, filename):
+    """保存测试结果到CSV文件"""
+    try:
+        with open(filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(['IP地址', '延迟(ms)', '下载速度(KB/s)', '状态'])
+            for result in results:
+                status = '可用' if result['latency'] is not None else '不可用'
+                writer.writerow([result['ip'], result['latency'], result['speed'], status])
+        logging.info(f"成功保存 {len(results)} 个IP测试结果到 {filename}")
+    except IOError as e:
+        logging.error(f"测试结果保存失败: {e}")
 
 def process_site(site):
     """处理单个网站,返回IPv4和IPv6集合"""
@@ -130,6 +185,50 @@ def main():
     all_ips = ipv4_list + ipv6_list
     if all_ips:
         save_results(all_ips, CONFIG['OUTPUT_FILE'])
+    
+    # 进行延迟和网速测试
+    if all_ips:
+        logging.info("开始进行延迟和网速测试...")
+        test_results = []
+        
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            # 测试所有IP的延迟
+            latency_results = list(executor.map(lambda ip: (ip, test_ip_connection(ip)), all_ips))
+            
+            # 测试所有IP的速度
+            speed_results = list(executor.map(lambda ip: (ip, test_ip_speed(ip)), all_ips))
+        
+        # 合并结果
+        latency_dict = {ip: latency for ip, latency in latency_results}
+        speed_dict = {ip: speed for ip, speed in speed_results}
+        
+        for ip in all_ips:
+            test_results.append({
+                'ip': ip,
+                'latency': latency_dict.get(ip),
+                'speed': speed_dict.get(ip)
+            })
+        
+        # 按延迟排序
+        test_results.sort(key=lambda x: (x['latency'] is None, x['latency']))
+        
+        # 保存测试结果
+        save_test_results(test_results, CONFIG['TEST_RESULT_FILE'])
+        
+        # 输出统计信息
+        available_ips = [r for r in test_results if r['latency'] is not None]
+        if available_ips:
+            avg_latency = sum(r['latency'] for r in available_ips) / len(available_ips)
+            avg_speed = sum(r['speed'] for r in available_ips if r['speed']) / len([r for r in available_ips if r['speed']]) if any(r['speed'] for r in available_ips) else 0
+            logging.info(f"可用IP数量: {len(available_ips)}/{len(all_ips)}")
+            logging.info(f"平均延迟: {avg_latency:.2f}ms")
+            logging.info(f"平均速度: {avg_speed:.2f}KB/s")
+            
+            # 输出最优的5个IP
+            logging.info("最优的5个IP:")
+            for i, result in enumerate(available_ips[:5], 1):
+                speed_info = f"{result['speed']}KB/s" if result['speed'] else "N/A"
+                logging.info(f"  {i}. {result['ip']} - 延迟: {result['latency']}ms, 速度: {speed_info}")
 
 if __name__ == '__main__':
     main()
